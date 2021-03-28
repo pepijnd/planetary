@@ -3,6 +3,8 @@
 layout(location=0) in vec3 a_position;
 layout(location=1) in vec3 a_normal;
 layout(location=2) in uint a_index;
+layout(location=3) in vec2 a_tex_coord;
+layout(location=4) in uint a_tex_idx;
 
 layout(set=0, binding=0) uniform Uniforms
 {
@@ -19,6 +21,8 @@ layout(location=0) out vec3 v_position;
 layout(location=1) out vec3 v_normal;
 layout(location=2) out vec3 v_color;
 layout(location=3) flat out uint v_index;
+layout(location=4) out vec2 v_tex_coord;
+layout(location=5) flat out uint v_tex_idx;
 
 void main()
 {
@@ -30,8 +34,10 @@ void main()
     };
     vec4 modal_space = vec4(a_position, 1.0);
     v_normal = a_normal;
+    v_tex_coord = a_tex_coord;
     v_position = modal_space.xyz;
     v_index = a_index;
+    v_tex_idx = a_tex_idx;
     vec3 normal = vec3(1.0, 2.0, 3.0);
     gl_Position = u_view_proj * modal_space;
 }

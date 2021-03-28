@@ -1,37 +1,5 @@
-[package]
-name = "planetary"
-version = "0.1.0"
-authors = ["Pepijn Dragt <pepijn.dragt@gmail.com>"]
-edition = "2018"
+[workspace]
+members = ["engine", "resources", "game"]
 
-[dependencies]
-bytemuck = { version = "1.5.0", features = [ "derive" ] }
-glam = { version = "0.12.0", features = [ "bytemuck", "mint" ] }
-
-image = "0.23.12"
-winit = "0.24.0"
-env_logger = "0.8.2"
-log = "0.4.13"
-wgpu = "0.7.0"
-futures = "0.3.12"
-anyhow = "1.0.38"
-imgui-wgpu = "0.14.0"
-imgui = "0.7.0"
-imgui-winit-support = "0.7.0"
-num-traits = "0.2.14"
-crevice = "0.6.0"
-mint = "0.5.6"
-palette = "0.5.0"
-phf = "0.8.0"
-lazy_static = "1.4.0"
-parking_lot = "0.11.1"
-gc-arena = "0.2.0"
-
-[build-dependencies]
-anyhow = "1.0"
-fs_extra = "1.1"
-glob = "0.3"
-shaderc = "0.7"
-
-[profile.release]
-debug = true
+[profile.dev.package.resources]
+opt-level = 3
