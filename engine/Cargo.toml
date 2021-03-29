@@ -11,12 +11,12 @@ resources = { path = "../resources" }
 
 bytemuck = { version = "1.5.0", features = [ "derive" ] }
 glam = { version = "0.13.1", features = [ "bytemuck", "mint" ] }
+futures = { version = "0.3.12", features = [ "thread-pool" ] }
 
 winit = "0.24.0"
 env_logger = "0.8.2"
 log = "0.4.13"
 wgpu = "0.7.0"
-futures = "0.3.12"
 anyhow = "1.0.40"
 num-traits = "0.2.14"
 crevice = "0.6.0"

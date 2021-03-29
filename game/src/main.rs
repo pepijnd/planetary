@@ -1,12 +1,74 @@
-use editor::Editor;
-use engine::Runner;
+use std::sync::Arc;
+
+use editor::{Editor, MainGameThread};
+use engine::{render::RenderTarget, MainRunner, ThreadRunner};
+use parking_lot::Mutex;
+use ui::EditorUi;
 
 pub mod editor;
 pub mod pipelines;
 pub mod structures;
 pub mod ui;
 
-impl Runner for Editor {
+impl MainRunner for MainGameThread {
+    type Runner = Editor;
+
+    fn build(
+        window: &winit::window::Window,
+        device: &wgpu::Device,
+        queue: &wgpu::Queue,
+        sc_desc: &wgpu::SwapChainDescriptor,
+        runner: Arc<Mutex<Self::Runner>>,
+    ) -> Self {
+        let ui = {
+            let mut runner = runner.lock();
+            let state = &mut runner.state;
+            EditorUi::new(window, device, queue, sc_desc, state)
+        };
+        Self { ui, runner }
+    }
+
+    fn global_event(
+        &mut self,
+        event: &winit::event::Event<()>,
+        window: &winit::window::Window,
+        cf: &mut winit::event_loop::ControlFlow,
+    ) {
+        self.ui.handle_event(window, event)
+    }
+
+    fn resize(&mut self, device: &wgpu::Device, size: (u32, u32)) {
+        let mut runner = self.runner.lock();
+        self.ui.resize(&device, size, &mut runner.state);
+    }
+
+    fn update(
+        &mut self,
+        window: &winit::window::Window,
+        device: &wgpu::Device,
+        queue: &wgpu::Queue,
+        delta: std::time::Duration,
+    ) {
+        self.ui.update(window, delta);
+    }
+    fn input(&mut self, event: engine::RunnerEvent) {}
+
+    fn render(
+        &mut self,
+        device: &wgpu::Device,
+        queue: &wgpu::Queue,
+        target: &RenderTarget,
+        frame: &wgpu::TextureView,
+        encoder: &mut wgpu::CommandEncoder,
+        window: &winit::window::Window,
+    ) {
+        let mut runner = self.runner.lock();
+        self.ui
+            .render(&mut runner.state, frame, encoder, queue, device, window)
+    }
+}
+
+impl ThreadRunner for Editor {
     fn build(
         window: &winit::window::Window,
         device: &wgpu::Device,
@@ -22,19 +84,14 @@ impl Runner for Editor {
         window: &winit::window::Window,
         _cf: &mut winit::event_loop::ControlFlow,
     ) {
-        self.ui.handle_event(window, event)
     }
 
-    fn input(
-        &mut self,
-        event: engine::RunnerEvent,
-        _cf: &mut winit::event_loop::ControlFlow,
-    ) {
+    fn input(&mut self, event: engine::RunnerEvent) {
         self.input(event);
     }
 
-    fn resize(&mut self, device: &wgpu::Device, sc_desc: &wgpu::SwapChainDescriptor) {
-        self.resize(device, sc_desc)
+    fn resize(&mut self, device: &wgpu::Device, size: (u32, u32)) {
+        self.resize(device, size)
     }
 
     fn update(
@@ -42,25 +99,24 @@ impl Runner for Editor {
         window: &winit::window::Window,
         device: &wgpu::Device,
         queue: &wgpu::Queue,
-        sc_desc: &wgpu::SwapChainDescriptor,
         delta: std::time::Duration,
     ) {
-        self.update(device, queue, sc_desc, window, delta)
+        self.update(device, queue, window, delta)
     }
 
     fn render(
         &mut self,
-        frame: &wgpu::SwapChainTexture,
         device: &wgpu::Device,
         queue: &wgpu::Queue,
-        sc_desc: &wgpu::SwapChainDescriptor,
+        target: &RenderTarget,
+        frame: &wgpu::TextureView,
         encoder: &mut wgpu::CommandEncoder,
         window: &winit::window::Window,
     ) {
-        self.render(frame, device, queue, sc_desc, encoder, window)
+        self.render(device, queue, target, frame, encoder, window)
     }
 }
 
 fn main() -> Result<(), std::boxed::Box<(dyn std::error::Error)>> {
-    engine::run::<Editor>()
+    engine::run::<MainGameThread>()
 }

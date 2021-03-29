@@ -1,12 +1,17 @@
-use futures::executor::block_on;
+use std::sync::Arc;
+
 use num_traits::float::FloatConst;
+use parking_lot::Mutex;
 use wgpu::TextureFormat;
 
 use engine::{
     camera::Camera,
+    event::WindowEvent,
     graphics::common::{BundleData, PipelineFormat, Renderer, RendererInvalid},
     graphics::helper::begin_render_pass,
     graphics::{common::ItemBuffer, texture::Texture},
+    render::RenderTarget,
+    MainRunner,
 };
 use winit::event::{ElementState, KeyboardInput, VirtualKeyCode};
 
@@ -16,9 +21,14 @@ use crate::{
     ui::{EditorState, EditorUi},
 };
 
+pub struct MainGameThread {
+    pub ui: EditorUi,
+    pub runner: Arc<Mutex<<Self as MainRunner>::Runner>>,
+}
+
 pub struct Editor {
     pub camera: Camera,
-    pub size: [u32; 2],
+    pub size: (u32, u32),
 
     pub ico: Ico,
     pub ico_buffer: IcoBuffer,
@@ -35,7 +45,6 @@ pub struct Editor {
     pub selected: u32,
 
     pub modifiers: winit::event::ModifiersState,
-    pub ui: EditorUi,
     pub state: EditorState,
 
     pub delta: std::time::Duration,
@@ -66,8 +75,18 @@ impl Editor {
         };
 
         let depth_texture = Texture::depth(device, size, 1, Some("depth_texture"));
-        let sampled_depth_texture = Texture::depth(device, size, *state.samples as u32, Some("depth_texture_sampled"));
-        let msaa = Texture::msaa(device, size, *state.samples as u32, Some("depth_texture_sampled"));
+        let sampled_depth_texture = Texture::depth(
+            device,
+            size,
+            *state.samples as u32,
+            Some("depth_texture_sampled"),
+        );
+        let msaa = Texture::msaa(
+            device,
+            size,
+            *state.samples as u32,
+            Some("depth_texture_sampled"),
+        );
         let select = Texture::select(device, size, Some("depth_texture"));
 
         let select_buffer = select.make_buffer(
@@ -75,7 +94,7 @@ impl Editor {
             wgpu::BufferUsage::COPY_DST | wgpu::BufferUsage::MAP_READ,
         );
 
-        let size = [sc_desc.width, sc_desc.height];
+        let size = (sc_desc.width, sc_desc.height);
 
         let mut ico_buffer = IcoBuffer::build(device);
         let ico = Ico::divs(*state.size as usize);
@@ -140,7 +159,6 @@ impl Editor {
             select_buffer,
             selected: 0,
 
-            ui,
             state,
             modifiers,
 
@@ -151,91 +169,104 @@ impl Editor {
             mouse_pos,
             mouse_pressed,
 
-            rotating: 0.0
+            rotating: 0.0,
         }
     }
 
     pub fn input(&mut self, event: engine::RunnerEvent) -> bool {
         match event {
-            engine::RunnerEvent::Window(event) => {
-                match event {
-                    winit::event::WindowEvent::CursorMoved { position, .. } => {
-                        self.mouse_pos = [
-                            (2.0 * position.x as f32 / self.size[0] as f32) - 1.0,
-                            (2.0 * position.y as f32 / self.size[1] as f32) - 1.0,
-                        ]
-                        .into();
-                        self.mouse_raw = [position.x as u32, position.y as u32];
-                        true
-                    }
-                    winit::event::WindowEvent::MouseInput {
-                        state: winit::event::ElementState::Pressed,
-                        button: winit::event::MouseButton::Left,
-                        ..
-                    } => {
-                        self.mouse_last = self.mouse_pos;
-                        self.mouse_pressed = true;
-                        true
-                    }
-                    winit::event::WindowEvent::MouseWheel {
-                        delta: winit::event::MouseScrollDelta::LineDelta(_, scroll),
-                        phase: winit::event::TouchPhase::Moved,
-                        ..
-                    } => {
-                        *self.state.zoom += scroll * -0.1;
-                        if *self.state.zoom < 0.1 {
-                            *self.state.zoom = 0.1
-                        }
-                        if *self.state.zoom > 2.0 {
-                            *self.state.zoom = 2.0
-                        }
-                        true
-                    }
-                    winit::event::WindowEvent::MouseInput {
-                        state: winit::event::ElementState::Released,
-                        button: winit::event::MouseButton::Left,
-                        ..
-                    } => {
-                        self.mouse_pressed = false;
-                        true
-                    }
-                    winit::event::WindowEvent::ModifiersChanged(m) => {
-                        self.modifiers = *m;
-                        true
-                    }
-                    _ => false,
+            engine::RunnerEvent::Window(event) => match event {
+                WindowEvent::CursorMoved { position, .. } => {
+                    self.mouse_pos = [
+                        (2.0 * position.0 as f32 / self.size.0 as f32) - 1.0,
+                        (2.0 * position.1 as f32 / self.size.1 as f32) - 1.0,
+                    ]
+                    .into();
+                    self.mouse_raw = [position.0 as u32, position.1 as u32];
+                    true
                 }
-            }
-            engine::RunnerEvent::Device(event) => {
-                match event {
-                    winit::event::DeviceEvent::Key(KeyboardInput { virtual_keycode: Some(VirtualKeyCode::Q), state: ElementState::Pressed, .. }) => {
-                        self.rotating = -1.275 * self.delta.as_secs_f32();
-                        true
-                    },
-                    winit::event::DeviceEvent::Key(KeyboardInput { virtual_keycode: Some(VirtualKeyCode::E), state: ElementState::Pressed, .. }) => {
-                        self.rotating = 1.275 * self.delta.as_secs_f32();
-                        true
-                    },
-                    winit::event::DeviceEvent::Key(KeyboardInput { virtual_keycode: Some(VirtualKeyCode::Q), state: ElementState::Released, .. }) => {
-                        if self.rotating < 0.0 {
-                            self.rotating = 0.0;
-                        }
-                        true
-                    },
-                    winit::event::DeviceEvent::Key(KeyboardInput { virtual_keycode: Some(VirtualKeyCode::E), state: ElementState::Released, .. }) => {
-                        if self.rotating > 0.0 {
-                            self.rotating = 0.0;
-                        }
-                        true
-                    },
-                    _ => { false }
+                WindowEvent::MouseInput {
+                    state: winit::event::ElementState::Pressed,
+                    button: winit::event::MouseButton::Left,
+                    ..
+                } => {
+                    self.mouse_last = self.mouse_pos;
+                    self.mouse_pressed = true;
+                    true
                 }
-            }
+                WindowEvent::MouseWheel {
+                    delta: winit::event::MouseScrollDelta::LineDelta(_, scroll),
+                    phase: winit::event::TouchPhase::Moved,
+                    ..
+                } => {
+                    *self.state.zoom += scroll * -0.1;
+                    if *self.state.zoom < 0.1 {
+                        *self.state.zoom = 0.1
+                    }
+                    if *self.state.zoom > 2.0 {
+                        *self.state.zoom = 2.0
+                    }
+                    true
+                }
+                WindowEvent::MouseInput {
+                    state: winit::event::ElementState::Released,
+                    button: winit::event::MouseButton::Left,
+                    ..
+                } => {
+                    self.mouse_pressed = false;
+                    true
+                }
+                WindowEvent::ModifiersChanged(m) => {
+                    self.modifiers = m;
+                    true
+                }
+                _ => false,
+            },
+            engine::RunnerEvent::Device(event) => match event {
+                winit::event::DeviceEvent::Key(KeyboardInput {
+                    virtual_keycode: Some(VirtualKeyCode::Q),
+                    state: ElementState::Pressed,
+                    ..
+                }) => {
+                    self.rotating = -1.275 * self.delta.as_secs_f32();
+                    true
+                }
+                winit::event::DeviceEvent::Key(KeyboardInput {
+                    virtual_keycode: Some(VirtualKeyCode::E),
+                    state: ElementState::Pressed,
+                    ..
+                }) => {
+                    self.rotating = 1.275 * self.delta.as_secs_f32();
+                    true
+                }
+                winit::event::DeviceEvent::Key(KeyboardInput {
+                    virtual_keycode: Some(VirtualKeyCode::Q),
+                    state: ElementState::Released,
+                    ..
+                }) => {
+                    if self.rotating < 0.0 {
+                        self.rotating = 0.0;
+                    }
+                    true
+                }
+                winit::event::DeviceEvent::Key(KeyboardInput {
+                    virtual_keycode: Some(VirtualKeyCode::E),
+                    state: ElementState::Released,
+                    ..
+                }) => {
+                    if self.rotating > 0.0 {
+                        self.rotating = 0.0;
+                    }
+                    true
+                }
+                _ => false,
+            },
+            engine::RunnerEvent::None => false,
         }
     }
 
-    pub fn resize(&mut self, device: &wgpu::Device, sc_desc: &wgpu::SwapChainDescriptor) {
-        self.size = [sc_desc.width, sc_desc.height];
+    pub fn resize(&mut self, device: &wgpu::Device, size: (u32, u32)) {
+        self.size = size;
         self.msaa = self.msaa.with_size(device, self.size);
         self.depth_texture = self.depth_texture.with_size(device, self.size);
         self.sampled_depth_texture = self.sampled_depth_texture.with_size(device, self.size);
@@ -245,22 +276,21 @@ impl Editor {
             device,
             wgpu::BufferUsage::COPY_DST | wgpu::BufferUsage::MAP_READ,
         );
-        self.ui.resize(&device, &sc_desc, &mut self.state);
-        self.camera.resize(&sc_desc);
+        self.camera.resize(size);
     }
 
     pub fn update(
         &mut self,
         device: &wgpu::Device,
         queue: &wgpu::Queue,
-        sc_desc: &wgpu::SwapChainDescriptor,
         window: &winit::window::Window,
         delta: std::time::Duration,
     ) {
         self.delta = delta;
 
         if let Some(&samples) = self.state.samples.on_change() {
-            self.sampled_depth_texture = self.sampled_depth_texture
+            self.sampled_depth_texture = self
+                .sampled_depth_texture
                 .with_samples(device, samples as u32);
             self.msaa = self.msaa.with_samples(device, samples as u32);
 
@@ -268,10 +298,11 @@ impl Editor {
         }
 
         self.state.frame_times.push(delta);
-        self.ui.update(window, delta);
 
         self.camera.zoom = *self.state.zoom;
-        if self.mouse_pressed && !self.ui.has_mouse() {
+        if self.mouse_pressed
+        /* && !self.ui.has_mouse() */
+        {
             self.camera.pan(self.mouse_pos - self.mouse_last, 2.0);
         }
         self.camera.rotate(self.rotating);
@@ -285,23 +316,11 @@ impl Editor {
             self.ico_buffer.update(device, queue, &self.ico);
         }
 
-        let index = ((sc_desc.width * self.mouse_raw[1]) + self.mouse_raw[0])
-            .min(sc_desc.width * sc_desc.height - 1) as wgpu::BufferAddress;
-        let new = block_on(self.select_buffer.mapped_read(device, index));
-        if self.selected != new {
-            if let Some(face) = self.ico.face(new) {
-                self.ico_uniform.s1 = face.siblings[0].map(|s| s.get()).unwrap_or(0);
-                self.ico_uniform.s2 = face.siblings[1].map(|s| s.get()).unwrap_or(0);
-                self.ico_uniform.s3 = face.siblings[2].map(|s| s.get()).unwrap_or(0);
-            } else {
-                self.ico_uniform.s1 = 0;
-                self.ico_uniform.s2 = 0;
-                self.ico_uniform.s3 = 0;
-            }
-            self.selected = new;
-        }
+        // let index = ((sc_desc.width * self.mouse_raw[1]) + self.mouse_raw[0])
+        //     .min(sc_desc.width * sc_desc.height - 1) as wgpu::BufferAddress;
+        // let new = block_on(self.select_buffer.mapped_read(device, index));
 
-        self.select_buffer.buffer().unmap();
+        // self.select_buffer.buffer().unmap();
 
         self.ico_uniform.view_proj = view_proj.into();
         self.ico_uniform.view_angle = self.camera.rot.into();
@@ -321,10 +340,10 @@ impl Editor {
 
     pub fn render(
         &mut self,
-        frame: &wgpu::SwapChainTexture,
         device: &wgpu::Device,
         queue: &wgpu::Queue,
-        sc_desc: &wgpu::SwapChainDescriptor,
+        target: &RenderTarget,
+        frame: &wgpu::TextureView,
         encoder: &mut wgpu::CommandEncoder,
         window: &winit::window::Window,
     ) {
@@ -334,10 +353,11 @@ impl Editor {
         } else {
             Some(&self.msaa)
         };
+        let size = target.size();
         {
             let mut pass = begin_render_pass(
                 encoder,
-                &frame.view,
+                &frame,
                 Some(&self.sampled_depth_texture),
                 color,
                 msaa,
@@ -368,40 +388,15 @@ impl Editor {
                 buffer: &self.select_buffer.buffer(),
                 layout: wgpu::TextureDataLayout {
                     offset: 0,
-                    bytes_per_row: 4 * sc_desc.width,
-                    rows_per_image: sc_desc.height,
+                    bytes_per_row: 4 * size.0,
+                    rows_per_image: size.1,
                 },
             },
             wgpu::Extent3d {
-                width: sc_desc.width,
-                height: sc_desc.height,
+                width: size.0,
+                height: size.1,
                 depth: 1,
             },
         );
-
-        if let Some(image_id) = self.state.image_id {
-            if let Some(target) = self.ui.renderer.textures.get(image_id) {
-                encoder.copy_texture_to_texture(
-                    wgpu::TextureCopyView {
-                        texture: &self.sampled_depth_texture.texture,
-                        mip_level: 0,
-                        origin: Default::default(),
-                    },
-                    wgpu::TextureCopyView {
-                        texture: &target.texture(),
-                        mip_level: 0,
-                        origin: Default::default(),
-                    },
-                    wgpu::Extent3d {
-                        width: sc_desc.width,
-                        height: sc_desc.height,
-                        depth: 1,
-                    },
-                )
-            }
-        }
-
-        self.ui
-            .render(&mut self.state, &frame.view, encoder, queue, device, window);
     }
 }

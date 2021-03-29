@@ -33,7 +33,11 @@ pub fn load(device: &wgpu::Device, queue: &wgpu::Queue) -> Result<(), Box<dyn st
         match resource {
             Resource::Image(image) => {
                 let size = image.read(&mut buffer)?;
-                log::info!("loading texture array: {} {:?}", label, (image.size, image.depth, image.levels));
+                log::info!(
+                    "loading texture array: {} {:?}",
+                    label,
+                    (image.size, image.depth, image.levels)
+                );
 
                 let texture = make_texture(
                     device,

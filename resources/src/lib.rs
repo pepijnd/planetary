@@ -3,8 +3,6 @@ use std::io::Read;
 
 pub use resources::*;
 
-
-
 pub fn read() -> Result<Vec<ResourceItem>, Box<dyn std::error::Error>> {
     let path = std::env::current_exe()?
         .parent()

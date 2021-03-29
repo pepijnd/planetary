@@ -145,10 +145,10 @@ impl Texture {
         );
     }
 
-    pub fn with_size(&self, device: &wgpu::Device, size: [u32; 2]) -> Self {
+    pub fn with_size(&self, device: &wgpu::Device, size: (u32, u32)) -> Self {
         let size = wgpu::Extent3d {
-            width: size[0],
-            height: size[1],
+            width: size.0,
+            height: size.1,
             depth: 1,
         };
         let label = self.label.clone();

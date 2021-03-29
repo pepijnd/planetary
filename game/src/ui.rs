@@ -182,14 +182,9 @@ impl EditorUi {
         self.context.io().want_capture_keyboard
     }
 
-    pub fn resize(
-        &mut self,
-        device: &wgpu::Device,
-        sc_desc: &wgpu::SwapChainDescriptor,
-        state: &mut EditorState,
-    ) {
+    pub fn resize(&mut self, device: &wgpu::Device, size: (u32, u32), state: &mut EditorState) {
         let mut io = self.context.io_mut();
-        io.display_size = [sc_desc.width as f32, sc_desc.height as f32];
+        io.display_size = [size.0 as f32, size.1 as f32];
 
         if let Some(image_id) = state.image_id {
             let image = imgui_wgpu::Texture::new(
@@ -197,8 +192,8 @@ impl EditorUi {
                 &self.renderer,
                 imgui_wgpu::TextureConfig {
                     size: wgpu::Extent3d {
-                        width: sc_desc.width,
-                        height: sc_desc.height,
+                        width: size.0,
+                        height: size.1,
                         depth: 1,
                     },
                     usage: wgpu::TextureUsage::SAMPLED | wgpu::TextureUsage::COPY_DST,
@@ -273,6 +268,28 @@ impl EditorUi {
         device: &wgpu::Device,
         window: &winit::window::Window,
     ) {
+        // if let Some(image_id) = self.state.image_id {
+        //     if let Some(texture) = self.ui.renderer.textures.get(image_id) {
+        //         encoder.copy_texture_to_texture(
+        //             wgpu::TextureCopyView {
+        //                 texture: &self.sampled_depth_texture.texture,
+        //                 mip_level: 0,
+        //                 origin: Default::default(),
+        //             },
+        //             wgpu::TextureCopyView {
+        //                 texture: &texture.texture(),
+        //                 mip_level: 0,
+        //                 origin: Default::default(),
+        //             },
+        //             wgpu::Extent3d {
+        //                 width: size.0,
+        //                 height: size.1,
+        //                 depth: 1,
+        //             },
+        //         )
+        //     }
+        // }
+
         let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
             label: Some("block_pipeline_render_pass"),
             color_attachments: &[wgpu::RenderPassColorAttachmentDescriptor {

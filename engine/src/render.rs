@@ -1,14 +1,56 @@
+use std::sync::Arc;
+
+use parking_lot::Mutex;
 use winit::window::Window;
 
-use crate::Runner;
+use crate::{MainRunner, ThreadRunner};
+
+pub struct RenderTarget {
+    pub sc_desc: wgpu::SwapChainDescriptor,
+    pub swap_chain: wgpu::SwapChain,
+}
 
 pub struct RenderState {
     pub surface: wgpu::Surface,
     pub device: wgpu::Device,
     pub queue: wgpu::Queue,
-    pub sc_desc: wgpu::SwapChainDescriptor,
-    pub swap_chain: wgpu::SwapChain,
-    pub size: winit::dpi::PhysicalSize<u32>,
+    pub target: Arc<Mutex<RenderTarget>>,
+}
+
+impl RenderTarget {
+    pub fn new(
+        device: &wgpu::Device,
+        surface: &wgpu::Surface,
+        sc_desc: &wgpu::SwapChainDescriptor,
+    ) -> Self {
+        let swap_chain = device.create_swap_chain(&surface, &sc_desc);
+        Self {
+            sc_desc: sc_desc.clone(),
+            swap_chain,
+        }
+    }
+
+    pub fn resize(&mut self, device: &wgpu::Device, surface: &wgpu::Surface, size: (u32, u32)) {
+        self.sc_desc.width = size.0;
+        self.sc_desc.height = size.1;
+        self.rebuild(device, surface);
+    }
+
+    pub fn size(&self) -> (u32, u32) {
+        (self.sc_desc.width, self.sc_desc.height)
+    }
+
+    pub fn sc_desc(&self) -> &wgpu::SwapChainDescriptor {
+        &self.sc_desc
+    }
+
+    pub fn frame(&self) -> Result<wgpu::SwapChainFrame, wgpu::SwapChainError> {
+        self.swap_chain.get_current_frame()
+    }
+
+    pub fn rebuild(&mut self, device: &wgpu::Device, surface: &wgpu::Surface) {
+        self.swap_chain = device.create_swap_chain(surface, &self.sc_desc);
+    }
 }
 
 impl RenderState {
@@ -44,48 +86,61 @@ impl RenderState {
             present_mode: wgpu::PresentMode::Immediate,
         };
 
-        let swap_chain = device.create_swap_chain(&surface, &sc_desc);
+        let target = RenderTarget::new(&device, &surface, &sc_desc);
+        let target = Arc::new(Mutex::new(target));
 
         Self {
             surface,
             device,
             queue,
-            sc_desc,
-            swap_chain,
-            size,
+            target,
         }
     }
 
-    pub fn resize<T>(&mut self, new_size: winit::dpi::PhysicalSize<u32>, runner: &mut T)
+    pub fn resize<T>(self: &Arc<Self>, size: (u32, u32), runner: Arc<Mutex<T>>)
     where
-        T: Runner,
+        T: ThreadRunner,
     {
-        self.size = new_size;
-        self.sc_desc.width = new_size.width;
-        self.sc_desc.height = new_size.height;
-        self.swap_chain = self.device.create_swap_chain(&self.surface, &self.sc_desc);
-        runner.resize(&self.device, &self.sc_desc);
+        let mut target = self.target.lock();
+        let mut runner = runner.lock();
+        target.resize(&self.device, &self.surface, size);
+        runner.resize(&self.device, target.size());
     }
 
-    pub fn render<T>(
-        &mut self,
+    pub fn render<T, M>(
+        self: &Arc<Self>,
         window: &winit::window::Window,
-        runner: &mut T,
+        thread_runner: Arc<Mutex<T>>,
+        runner: &mut M,
     ) -> Result<(), wgpu::SwapChainError>
     where
-        T: Runner,
+        T: ThreadRunner,
+        M: MainRunner,
     {
-        let frame = self.swap_chain.get_current_frame()?.output;
+        let target = self.target.lock();
+        let frame = target.frame()?;
         let mut encoder = self
             .device
             .create_command_encoder(&wgpu::CommandEncoderDescriptor {
                 label: Some("render_encoder"),
             });
+        {
+            let mut thread_runner = thread_runner.lock();
+            thread_runner.render(
+                &self.device,
+                &self.queue,
+                &target,
+                &frame.output.view,
+                &mut encoder,
+                window,
+            );
+        }
+
         runner.render(
-            &frame,
             &self.device,
             &self.queue,
-            &self.sc_desc,
+            &target,
+            &frame.output.view,
             &mut encoder,
             window,
         );

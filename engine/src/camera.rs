@@ -50,8 +50,8 @@ impl Camera {
         glam::Mat4::look_at_rh(self.rot, self.target, self.up)
     }
 
-    pub fn resize(&mut self, sc_desc: &wgpu::SwapChainDescriptor) {
-        self.aspect = sc_desc.width as f32 / sc_desc.height as f32
+    pub fn resize(&mut self, size: (u32, u32)) {
+        self.aspect = size.0 as f32 / size.1 as f32
     }
 
     pub fn pan(&mut self, dir: glam::Vec2, length: f32) {
@@ -61,7 +61,6 @@ impl Camera {
         self.up = right.cross(self.rot);
         self.rot = rot.normalize();
     }
-
 
     pub fn rotate(&mut self, angle: f32) {
         let rot = glam::Quat::from_axis_angle(self.rot, angle);

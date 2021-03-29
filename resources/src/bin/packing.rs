@@ -1,4 +1,4 @@
-use std::{io::prelude::*};
+use std::io::prelude::*;
 use std::{
     fs::read_to_string,
     path::{Path, PathBuf},
@@ -47,10 +47,16 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     for level in 0..levels {
                         let size = (size.0 / 2u32.pow(level), size.1 / 2u32.pow(level));
                         log::info!("resizeing to {:?}", size);
-                        let resized = image.resize(size.0, size.1, image::imageops::FilterType::Lanczos3);
+                        let resized =
+                            image.resize(size.0, size.1, image::imageops::FilterType::Lanczos3);
                         let mut encoded = Vec::new();
                         let encoder = image::codecs::dxt::DxtEncoder::new(&mut encoded);
-                        encoder.encode(resized.to_rgba8().as_bytes(), size.0, size.1, image::dxt::DXTVariant::DXT5)?;
+                        encoder.encode(
+                            resized.to_rgba8().as_bytes(),
+                            size.0,
+                            size.1,
+                            image::dxt::DXTVariant::DXT5,
+                        )?;
 
                         buffer.extend_from_slice(&encoded);
                     }

@@ -1,13 +1,13 @@
 use crevice::std140::AsStd140;
 
-use engine::{graphics::{
+use engine::graphics::{
     common::{
         BundleData, ItemBuffer, Pipeline, PipelineFormat, PipelineSettings, TextureBinding,
         UniformBinding,
     },
     helper::{create_buffer, create_pipeline, create_texture_binding, create_uniform_binding},
     texture::Texture,
-}};
+};
 
 use crate::structures::ico::Ico;
 
@@ -174,7 +174,7 @@ impl Pipeline for IcoRenderer {
         let IcoRendererSettings { vs, fs } = settings.clone();
         let tex_store = engine::textures();
         let tex_lock = tex_store.lock();
-        let textures= tex_lock.get("ico_textures").expect("texture not found");
+        let textures = tex_lock.get("ico_textures").expect("texture not found");
         let uniform_binding: UniformBinding<IcoUniform> =
             create_uniform_binding(device, Some("ico"));
         let texture_binding = create_texture_binding(device, textures, Some("ico"));

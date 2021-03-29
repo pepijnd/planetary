@@ -21,7 +21,7 @@ impl ImageRgba {
 
 #[derive(Serialize, Deserialize)]
 pub struct Shader {
-    pub data: Vec<u32>
+    pub data: Vec<u32>,
 }
 
 #[derive(Serialize, Deserialize)]
