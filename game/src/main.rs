@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use editor::{Editor, MainGameThread};
-use engine::{render::RenderTarget, MainRunner, ThreadRunner};
+use engine::{MainRunner, Size, ThreadRunner, render::RenderTarget};
 use parking_lot::Mutex;
 use ui::EditorUi;
 
@@ -90,7 +90,7 @@ impl ThreadRunner for Editor {
         self.input(event);
     }
 
-    fn resize(&mut self, device: &wgpu::Device, size: (u32, u32)) {
+    fn resize(&mut self, device: &wgpu::Device, size: Size) {
         self.resize(device, size)
     }
 

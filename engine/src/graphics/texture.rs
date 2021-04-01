@@ -1,3 +1,5 @@
+use crate::Size;
+
 use super::common::ItemBuffer;
 
 use wgpu::util::DeviceExt;
@@ -145,10 +147,10 @@ impl Texture {
         );
     }
 
-    pub fn with_size(&self, device: &wgpu::Device, size: (u32, u32)) -> Self {
+    pub fn with_size(&self, device: &wgpu::Device, size: Size) -> Self {
         let size = wgpu::Extent3d {
-            width: size.0,
-            height: size.1,
+            width: size.width,
+            height: size.height,
             depth: 1,
         };
         let label = self.label.clone();
@@ -183,7 +185,16 @@ impl Texture {
     }
 
     pub fn make_buffer(&self, device: &wgpu::Device, usage: wgpu::BufferUsage) -> ItemBuffer<u32> {
-        let items = self.size.width * self.size.height;
+        let width = {
+            let align = 256 / std::mem::size_of::<u32>();
+            let offset = self.size.width as usize % align;
+            if offset == 0 {
+                self.size.width as usize
+            } else {
+                self.size.width as usize / align * align + align
+            }
+        } as u32;
+        let items = width * self.size.height;
         let buffer = crate::graphics::helper::create_buffer_size::<u32, _>(
             device,
             items as usize,

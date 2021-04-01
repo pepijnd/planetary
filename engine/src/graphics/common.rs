@@ -4,8 +4,30 @@ use std::sync::{atomic::AtomicUsize, Arc};
 use crevice::std140::Std140;
 use parking_lot::{RwLock, RwLockReadGuard};
 use wgpu::SwapChainDescriptor;
+use winit::dpi::PhysicalSize;
 
 use crate::graphics::helper::create_buffer_size;
+
+#[derive(Debug, Clone, Copy, PartialEq, PartialOrd)]
+pub struct Size {
+    pub width: u32,
+    pub height: u32,
+}
+
+impl Size {
+    pub fn new(width: u32, height: u32) -> Self {
+        Self {
+            width,
+            height,
+        }
+    }
+}
+
+impl From<PhysicalSize<u32>> for Size {
+    fn from(size: PhysicalSize<u32>) -> Self {
+        Self::new(size.width, size.height)
+    }
+}
 
 #[derive(Debug)]
 pub struct PipelineSettings<'a> {

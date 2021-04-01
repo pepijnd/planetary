@@ -1,3 +1,5 @@
+use crate::Size;
+
 pub struct Camera {
     pub rot: glam::Vec3,
     pub target: glam::Vec3,
@@ -50,8 +52,8 @@ impl Camera {
         glam::Mat4::look_at_rh(self.rot, self.target, self.up)
     }
 
-    pub fn resize(&mut self, size: (u32, u32)) {
-        self.aspect = size.0 as f32 / size.1 as f32
+    pub fn resize(&mut self, size: Size) {
+        self.aspect = size.width as f32 / size.height as f32
     }
 
     pub fn pan(&mut self, dir: glam::Vec2, length: f32) {

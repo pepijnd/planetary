@@ -11,7 +11,7 @@ use engine::{
     graphics::helper::begin_render_pass,
     graphics::{common::ItemBuffer, texture::Texture},
     render::RenderTarget,
-    MainRunner,
+    MainRunner, Size,
 };
 use winit::event::{ElementState, KeyboardInput, VirtualKeyCode};
 
@@ -28,7 +28,7 @@ pub struct MainGameThread {
 
 pub struct Editor {
     pub camera: Camera,
-    pub size: (u32, u32),
+    pub size: Size,
 
     pub ico: Ico,
     pub ico_buffer: IcoBuffer,
@@ -94,7 +94,7 @@ impl Editor {
             wgpu::BufferUsage::COPY_DST | wgpu::BufferUsage::MAP_READ,
         );
 
-        let size = (sc_desc.width, sc_desc.height);
+        let size = Size::new(sc_desc.width, sc_desc.height);
 
         let mut ico_buffer = IcoBuffer::build(device);
         let ico = Ico::divs(*state.size as usize);
@@ -178,8 +178,8 @@ impl Editor {
             engine::RunnerEvent::Window(event) => match event {
                 WindowEvent::CursorMoved { position, .. } => {
                     self.mouse_pos = [
-                        (2.0 * position.0 as f32 / self.size.0 as f32) - 1.0,
-                        (2.0 * position.1 as f32 / self.size.1 as f32) - 1.0,
+                        (2.0 * position.0 as f32 / self.size.width as f32) - 1.0,
+                        (2.0 * position.1 as f32 / self.size.height as f32) - 1.0,
                     ]
                     .into();
                     self.mouse_raw = [position.0 as u32, position.1 as u32];
@@ -265,7 +265,7 @@ impl Editor {
         }
     }
 
-    pub fn resize(&mut self, device: &wgpu::Device, size: (u32, u32)) {
+    pub fn resize(&mut self, device: &wgpu::Device, size: Size) {
         self.size = size;
         self.msaa = self.msaa.with_size(device, self.size);
         self.depth_texture = self.depth_texture.with_size(device, self.size);
@@ -300,9 +300,7 @@ impl Editor {
         self.state.frame_times.push(delta);
 
         self.camera.zoom = *self.state.zoom;
-        if self.mouse_pressed
-        /* && !self.ui.has_mouse() */
-        {
+        if self.mouse_pressed && !self.state.ui_io.lock().wants_mouse {
             self.camera.pan(self.mouse_pos - self.mouse_last, 2.0);
         }
         self.camera.rotate(self.rotating);
@@ -388,13 +386,15 @@ impl Editor {
                 buffer: &self.select_buffer.buffer(),
                 layout: wgpu::TextureDataLayout {
                     offset: 0,
-                    bytes_per_row: 4 * size.0,
-                    rows_per_image: size.1,
+                    bytes_per_row: (self.select_buffer.num_items() * std::mem::size_of::<u32>())
+                        as u32
+                        / size.height,
+                    rows_per_image: size.height,
                 },
             },
             wgpu::Extent3d {
-                width: size.0,
-                height: size.1,
+                width: size.width,
+                height: size.height,
                 depth: 1,
             },
         );

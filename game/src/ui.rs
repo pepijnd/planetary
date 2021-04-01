@@ -1,4 +1,7 @@
+use std::sync::Arc;
+
 use engine::graphics::texture::Texture;
+use parking_lot::Mutex;
 
 pub struct UiValue<T>
 where
@@ -58,6 +61,15 @@ where
     }
 }
 
+pub struct UiIo {
+    pub wants_mouse: bool,
+    pub wants_keyboard: bool,
+}
+
+impl UiIo {
+    pub fn new(wants_mouse: bool, wants_keyboard: bool) -> Self { Self { wants_mouse, wants_keyboard } }
+}
+
 pub struct EditorState {
     pub size: UiValue<i32>,
     pub zoom: UiValue<f32>,
@@ -70,6 +82,8 @@ pub struct EditorState {
     pub fps: f32,
 
     pub image_id: Option<imgui::TextureId>,
+
+    pub ui_io: Arc<Mutex<UiIo>>,
 }
 
 impl Default for EditorState {
@@ -84,6 +98,7 @@ impl Default for EditorState {
             frame_times: Vec::with_capacity(60),
             fps: 0.0,
             image_id: None,
+            ui_io: Arc::new(Mutex::new(UiIo::new(false, false)))
         }
     }
 }
@@ -92,6 +107,7 @@ pub struct EditorUi {
     pub context: imgui::Context,
     pub renderer: imgui_wgpu::Renderer,
     pub platform: imgui_winit_support::WinitPlatform,
+    pub ui_io: Arc<Mutex<UiIo>>,
 }
 
 impl EditorUi {
@@ -155,6 +171,7 @@ impl EditorUi {
             context,
             renderer,
             platform,
+            ui_io: Arc::clone(&state.ui_io)
         }
     }
 
@@ -172,6 +189,9 @@ impl EditorUi {
         self.platform
             .prepare_frame(self.context.io_mut(), window)
             .unwrap();
+        let mut ui_io = self.ui_io.lock();
+        ui_io.wants_keyboard = self.context.io().want_capture_keyboard;
+        ui_io.wants_mouse = self.context.io().want_capture_mouse;
     }
 
     pub fn has_mouse(&self) -> bool {

@@ -3,9 +3,11 @@ use winit::event::{
     TouchPhase,
 };
 
+use crate::Size;
+
 #[derive(Debug, PartialEq)]
 pub enum WindowEvent {
-    Resized((u32, u32)),
+    Resized(Size),
     Moved((i32, i32)),
     CloseRequested,
     Destroyed,
@@ -38,7 +40,7 @@ pub enum WindowEvent {
     },
     ScaleFactorChanged {
         scale_factor: f64,
-        size: (u32, u32),
+        size: Size,
     },
     Other,
 }

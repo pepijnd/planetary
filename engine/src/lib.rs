@@ -15,6 +15,7 @@ pub mod graphics;
 pub mod render;
 mod resources;
 
+pub use crate::graphics::common::Size;
 pub use crate::resources::{shaders, textures};
 
 use event::WindowEvent;
@@ -69,7 +70,7 @@ pub trait ThreadRunner {
         cf: &mut ControlFlow,
     );
     fn input(&mut self, event: RunnerEvent);
-    fn resize(&mut self, device: &wgpu::Device, size: (u32, u32));
+    fn resize(&mut self, device: &wgpu::Device, size: Size);
     fn update(
         &mut self,
         window: &winit::window::Window,
@@ -153,19 +154,15 @@ where
                 let event: event::WindowEvent = event.into();
                 match event {
                     WindowEvent::CloseRequested => *control_flow = ControlFlow::Exit,
-                    WindowEvent::Resized(physical_size) => {
+                    WindowEvent::Resized(size) => {
                         let runner = Arc::clone(&thread_runner);
                         let renderer = Arc::clone(&renderer);
-                        pool.spawn_ok(async move {
-                            renderer.resize(physical_size, runner);
-                        });
+                        renderer.resize(size, runner);
                     }
                     WindowEvent::ScaleFactorChanged { size, .. } => {
                         let runner = Arc::clone(&thread_runner);
                         let renderer = Arc::clone(&renderer);
-                        pool.spawn_ok(async move {
-                            renderer.resize(size, runner);
-                        });
+                        renderer.resize(size, runner);
                     }
                     WindowEvent::KeyboardInput {
                         input:
@@ -199,6 +196,7 @@ where
                         }
                     });
                 }
+                runner.update(&window, &renderer.device, &renderer.queue, delta);
                 match renderer.render(&window, Arc::clone(&thread_runner), &mut runner) {
                     Ok(_) => {}
                     Err(wgpu::SwapChainError::Lost) => {
@@ -209,7 +207,7 @@ where
                         renderer.resize(size, Arc::clone(&thread_runner));
                     }
                     Err(wgpu::SwapChainError::OutOfMemory) => {}
-                    Err(e) => eprintln!("{:?}", e),
+                    Err(e) => log::warn!("{}", e),
                 }
             }
             Event::MainEventsCleared => {

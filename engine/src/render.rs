@@ -3,7 +3,7 @@ use std::sync::Arc;
 use parking_lot::Mutex;
 use winit::window::Window;
 
-use crate::{MainRunner, ThreadRunner};
+use crate::{MainRunner, Size, ThreadRunner};
 
 pub struct RenderTarget {
     pub sc_desc: wgpu::SwapChainDescriptor,
@@ -30,14 +30,14 @@ impl RenderTarget {
         }
     }
 
-    pub fn resize(&mut self, device: &wgpu::Device, surface: &wgpu::Surface, size: (u32, u32)) {
-        self.sc_desc.width = size.0;
-        self.sc_desc.height = size.1;
+    pub fn resize(&mut self, device: &wgpu::Device, surface: &wgpu::Surface, size: Size) {
+        self.sc_desc.width = size.width;
+        self.sc_desc.height = size.height;
         self.rebuild(device, surface);
     }
 
-    pub fn size(&self) -> (u32, u32) {
-        (self.sc_desc.width, self.sc_desc.height)
+    pub fn size(&self) -> Size {
+        Size::new(self.sc_desc.width, self.sc_desc.height)
     }
 
     pub fn sc_desc(&self) -> &wgpu::SwapChainDescriptor {
@@ -97,7 +97,7 @@ impl RenderState {
         }
     }
 
-    pub fn resize<T>(self: &Arc<Self>, size: (u32, u32), runner: Arc<Mutex<T>>)
+    pub fn resize<T>(self: &Arc<Self>, size: Size, runner: Arc<Mutex<T>>)
     where
         T: ThreadRunner,
     {
