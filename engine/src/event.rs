@@ -1,9 +1,16 @@
 use winit::event::{
-    DeviceId, ElementState, KeyboardInput, ModifiersState, MouseButton, MouseScrollDelta,
-    TouchPhase,
+    DeviceEvent, DeviceId, ElementState, KeyboardInput, ModifiersState, MouseButton,
+    MouseScrollDelta, TouchPhase,
 };
 
 use crate::Size;
+#[derive(Debug)]
+pub enum RunnerEvent {
+    Window(WindowEvent),
+    Device(DeviceEvent),
+    RenderComplete(std::time::Duration),
+    None,
+}
 
 #[derive(Debug, PartialEq)]
 pub enum WindowEvent {

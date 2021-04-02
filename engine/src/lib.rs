@@ -1,8 +1,13 @@
-use std::sync::Arc;
+#![feature(duration_consts_2)]
+#![feature(duration_saturating_ops)]
+
+use std::{collections::VecDeque, sync::Arc};
 
 use futures::executor::block_on;
-use parking_lot::Mutex;
+use inputs::spawn_input_thread;
+use parking_lot::{Condvar, Mutex};
 use render::RenderTarget;
+use updates::spawn_update_thread;
 use winit::{
     event::*,
     event_loop::{ControlFlow, EventLoop},
@@ -12,13 +17,15 @@ use winit::{
 pub mod camera;
 pub mod event;
 pub mod graphics;
+pub mod inputs;
 pub mod render;
 mod resources;
+pub mod updates;
 
 pub use crate::graphics::common::Size;
 pub use crate::resources::{shaders, textures};
 
-use event::WindowEvent;
+use event::{RunnerEvent, WindowEvent};
 
 pub trait MainRunner {
     type Runner: ThreadRunner + Send + Sync;
@@ -32,7 +39,7 @@ pub trait MainRunner {
     ) -> Self;
     fn global_event(
         &mut self,
-        event: &Event<()>,
+        event: &Event<RunnerEvent>,
         window: &winit::window::Window,
         cf: &mut ControlFlow,
     );
@@ -43,7 +50,6 @@ pub trait MainRunner {
         window: &winit::window::Window,
         device: &wgpu::Device,
         queue: &wgpu::Queue,
-        delta: std::time::Duration,
     );
     fn render(
         &mut self,
@@ -76,7 +82,6 @@ pub trait ThreadRunner {
         window: &winit::window::Window,
         device: &wgpu::Device,
         queue: &wgpu::Queue,
-        delta: std::time::Duration,
     );
     fn render(
         &mut self,
@@ -89,18 +94,13 @@ pub trait ThreadRunner {
     );
 }
 
-pub enum RunnerEvent {
-    Window(WindowEvent),
-    Device(DeviceEvent),
-    None,
-}
-
 pub fn run<T>() -> Result<(), Box<dyn std::error::Error>>
 where
     T: MainRunner + 'static,
 {
     env_logger::init();
-    let event_loop = EventLoop::new();
+    let event_loop = EventLoop::with_user_event();
+    let event_proxy = event_loop.create_proxy();
     let window = WindowBuilder::new()
         .with_inner_size(winit::dpi::LogicalSize::new(1280, 720))
         .build(&event_loop)
@@ -135,20 +135,23 @@ where
         )
     };
 
-    use futures::executor::ThreadPool;
-    let pool = ThreadPool::new().unwrap();
-
     let window = Arc::new(window);
+    let queue = Arc::new((Mutex::new(VecDeque::new()), Condvar::new()));
+
+    spawn_input_thread(Arc::clone(&queue), Arc::clone(&thread_runner));
+    spawn_update_thread(
+        Arc::clone(&thread_runner),
+        Arc::clone(&renderer),
+        Arc::clone(&window),
+    );
 
     event_loop.run(move |event, _, control_flow| {
         runner.global_event(&event, &window, control_flow);
         match event {
             Event::DeviceEvent { event, .. } => {
-                let runner = Arc::clone(&thread_runner);
-                pool.spawn_ok(async move {
-                    let mut runner = runner.lock();
-                    runner.input(RunnerEvent::Device(event))
-                });
+                let (lock, cvar) = &*queue;
+                lock.lock().push_back(RunnerEvent::Device(event));
+                cvar.notify_one();
             }
             Event::WindowEvent { event, window_id } if window_id == window.id() => {
                 let event: event::WindowEvent = event.into();
@@ -174,31 +177,32 @@ where
                         ..
                     } => *control_flow = ControlFlow::Exit,
                     event => {
-                        let runner = Arc::clone(&thread_runner);
-                        pool.spawn_ok(async move {
-                            let mut runner = runner.lock();
-                            runner.input(RunnerEvent::Window(event))
-                        });
+                        let (lock, cvar) = &*queue;
+                        lock.lock().push_back(RunnerEvent::Window(event));
+                        cvar.notify_one();
                     }
                 }
             }
+            Event::UserEvent(event) => {
+                let (lock, cvar) = &*queue;
+                lock.lock().push_back(event);
+                cvar.notify_one();
+            }
             Event::RedrawRequested(_) => {
+                let frame = std::time::Duration::from_secs_f32(1.0 / 60.0);
                 let delta = frame_time.elapsed();
                 frame_time = std::time::Instant::now();
-                {
-                    let runner = Arc::clone(&thread_runner);
-                    let renderer = Arc::clone(&renderer);
-                    let window = Arc::clone(&window);
-                    pool.spawn_ok(async move {
-                        {
-                            let mut runner = runner.lock();
-                            runner.update(&window, &renderer.device, &renderer.queue, delta);
-                        }
-                    });
-                }
-                runner.update(&window, &renderer.device, &renderer.queue, delta);
+                runner.update(&window, &renderer.device, &renderer.queue);
                 match renderer.render(&window, Arc::clone(&thread_runner), &mut runner) {
-                    Ok(_) => {}
+                    Ok(_) => {
+                        event_proxy
+                            .send_event(RunnerEvent::RenderComplete(delta))
+                            .unwrap();
+                        let curr_frame = frame_time.elapsed();
+                        if curr_frame < frame {
+                            std::thread::sleep(frame - curr_frame);
+                        }
+                    }
                     Err(wgpu::SwapChainError::Lost) => {
                         let size = {
                             let target = renderer.target.lock();

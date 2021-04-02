@@ -6,7 +6,7 @@ use wgpu::TextureFormat;
 
 use engine::{
     camera::Camera,
-    event::WindowEvent,
+    event::{RunnerEvent, WindowEvent},
     graphics::common::{BundleData, PipelineFormat, Renderer, RendererInvalid},
     graphics::helper::begin_render_pass,
     graphics::{common::ItemBuffer, texture::Texture},
@@ -47,6 +47,7 @@ pub struct Editor {
     pub modifiers: winit::event::ModifiersState,
     pub state: EditorState,
 
+    pub last_frame: std::time::Instant,
     pub delta: std::time::Duration,
 
     pub mouse_raw: [u32; 2],
@@ -162,7 +163,8 @@ impl Editor {
             state,
             modifiers,
 
-            delta: Default::default(),
+            delta: std::time::Duration::from_secs_f32(1.0/60.0),
+            last_frame: std::time::Instant::now(),
 
             mouse_raw,
             mouse_last,
@@ -173,9 +175,9 @@ impl Editor {
         }
     }
 
-    pub fn input(&mut self, event: engine::RunnerEvent) -> bool {
+    pub fn input(&mut self, event: RunnerEvent) -> bool {
         match event {
-            engine::RunnerEvent::Window(event) => match event {
+            RunnerEvent::Window(event) => match event {
                 WindowEvent::CursorMoved { position, .. } => {
                     self.mouse_pos = [
                         (2.0 * position.0 as f32 / self.size.width as f32) - 1.0,
@@ -222,7 +224,7 @@ impl Editor {
                 }
                 _ => false,
             },
-            engine::RunnerEvent::Device(event) => match event {
+            RunnerEvent::Device(event) => match event {
                 winit::event::DeviceEvent::Key(KeyboardInput {
                     virtual_keycode: Some(VirtualKeyCode::Q),
                     state: ElementState::Pressed,
@@ -261,7 +263,11 @@ impl Editor {
                 }
                 _ => false,
             },
-            engine::RunnerEvent::None => false,
+            RunnerEvent::RenderComplete(delta) => {
+                self.state.frame_times.push(delta);
+                false
+            }
+            RunnerEvent::None => false,
         }
     }
 
@@ -284,10 +290,7 @@ impl Editor {
         device: &wgpu::Device,
         queue: &wgpu::Queue,
         window: &winit::window::Window,
-        delta: std::time::Duration,
     ) {
-        self.delta = delta;
-
         if let Some(&samples) = self.state.samples.on_change() {
             self.sampled_depth_texture = self
                 .sampled_depth_texture
@@ -296,8 +299,6 @@ impl Editor {
 
             self.ico_screen.invalid(RendererInvalid::Pipeline);
         }
-
-        self.state.frame_times.push(delta);
 
         self.camera.zoom = *self.state.zoom;
         if self.mouse_pressed && !self.state.ui_io.lock().wants_mouse {

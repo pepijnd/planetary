@@ -16,10 +16,7 @@ pub struct Size {
 
 impl Size {
     pub fn new(width: u32, height: u32) -> Self {
-        Self {
-            width,
-            height,
-        }
+        Self { width, height }
     }
 }
 

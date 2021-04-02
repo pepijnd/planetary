@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use engine::graphics::texture::Texture;
+use engine::{event::RunnerEvent, graphics::texture::Texture};
 use parking_lot::Mutex;
 
 pub struct UiValue<T>
@@ -67,7 +67,12 @@ pub struct UiIo {
 }
 
 impl UiIo {
-    pub fn new(wants_mouse: bool, wants_keyboard: bool) -> Self { Self { wants_mouse, wants_keyboard } }
+    pub fn new(wants_mouse: bool, wants_keyboard: bool) -> Self {
+        Self {
+            wants_mouse,
+            wants_keyboard,
+        }
+    }
 }
 
 pub struct EditorState {
@@ -98,7 +103,7 @@ impl Default for EditorState {
             frame_times: Vec::with_capacity(60),
             fps: 0.0,
             image_id: None,
-            ui_io: Arc::new(Mutex::new(UiIo::new(false, false)))
+            ui_io: Arc::new(Mutex::new(UiIo::new(false, false))),
         }
     }
 }
@@ -171,14 +176,14 @@ impl EditorUi {
             context,
             renderer,
             platform,
-            ui_io: Arc::clone(&state.ui_io)
+            ui_io: Arc::clone(&state.ui_io),
         }
     }
 
     pub fn handle_event(
         &mut self,
         window: &winit::window::Window,
-        event: &winit::event::Event<()>,
+        event: &winit::event::Event<RunnerEvent>,
     ) {
         self.platform
             .handle_event(self.context.io_mut(), &window, &event)

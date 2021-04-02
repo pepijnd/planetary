@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use editor::{Editor, MainGameThread};
-use engine::{MainRunner, Size, ThreadRunner, render::RenderTarget};
+use engine::{MainRunner, Size, ThreadRunner, event::RunnerEvent, render::RenderTarget};
 use parking_lot::Mutex;
 use ui::EditorUi;
 
@@ -30,7 +30,7 @@ impl MainRunner for MainGameThread {
 
     fn global_event(
         &mut self,
-        event: &winit::event::Event<()>,
+        event: &winit::event::Event<RunnerEvent>,
         window: &winit::window::Window,
         cf: &mut winit::event_loop::ControlFlow,
     ) {
@@ -47,11 +47,10 @@ impl MainRunner for MainGameThread {
         window: &winit::window::Window,
         device: &wgpu::Device,
         queue: &wgpu::Queue,
-        delta: std::time::Duration,
     ) {
-        self.ui.update(window, delta);
+        self.ui.update(window, self.runner.lock().delta);
     }
-    fn input(&mut self, event: engine::RunnerEvent) {}
+    fn input(&mut self, event: engine::event::RunnerEvent) {}
 
     fn render(
         &mut self,
@@ -86,7 +85,7 @@ impl ThreadRunner for Editor {
     ) {
     }
 
-    fn input(&mut self, event: engine::RunnerEvent) {
+    fn input(&mut self, event: RunnerEvent) {
         self.input(event);
     }
 
@@ -99,9 +98,8 @@ impl ThreadRunner for Editor {
         window: &winit::window::Window,
         device: &wgpu::Device,
         queue: &wgpu::Queue,
-        delta: std::time::Duration,
     ) {
-        self.update(device, queue, window, delta)
+        self.update(device, queue, window)
     }
 
     fn render(
