@@ -1,12 +1,15 @@
 use crevice::std140::AsStd140;
 
-use engine::graphics::{
-    common::{
-        BundleData, ItemBuffer, Pipeline, PipelineFormat, PipelineSettings, TextureBinding,
-        UniformBinding,
+use engine::{
+    graphics::{
+        common::{
+            BundleData, ItemBuffer, Pipeline, PipelineFormat, PipelineSettings, TextureBinding,
+            UniformBinding,
+        },
+        helper::{create_buffer, create_pipeline, create_texture_binding, create_uniform_binding},
+        texture::Texture,
     },
-    helper::{create_buffer, create_pipeline, create_texture_binding, create_uniform_binding},
-    texture::Texture,
+    wgpu,
 };
 
 use crate::structures::ico::Ico;

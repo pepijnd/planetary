@@ -1,5 +1,7 @@
-use std::convert::TryInto;
-use std::sync::{atomic::AtomicUsize, Arc};
+use std::{
+    convert::TryInto,
+    sync::{atomic::AtomicUsize, Arc},
+};
 
 use crevice::std140::Std140;
 use parking_lot::{RwLock, RwLockReadGuard};

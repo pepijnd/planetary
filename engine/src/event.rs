@@ -1,3 +1,5 @@
+use std::time::Duration;
+
 use winit::event::{
     DeviceEvent, DeviceId, ElementState, KeyboardInput, ModifiersState, MouseButton,
     MouseScrollDelta, TouchPhase,
@@ -8,7 +10,10 @@ use crate::Size;
 pub enum RunnerEvent {
     Window(WindowEvent),
     Device(DeviceEvent),
-    RenderComplete(std::time::Duration),
+    RenderComplete {
+        frame_time: Duration,
+        tick_rate: f32,
+    },
     None,
 }
 

@@ -1,7 +1,7 @@
 #![feature(duration_consts_2)]
 #![feature(duration_saturating_ops)]
 
-use std::{collections::VecDeque, sync::Arc};
+use std::{collections::VecDeque, sync::Arc, time::Duration};
 
 use futures::executor::block_on;
 use inputs::spawn_input_thread;
@@ -15,17 +15,26 @@ use winit::{
 };
 
 pub mod camera;
+pub mod clock;
 pub mod event;
 pub mod graphics;
 pub mod inputs;
 pub mod render;
-mod resources;
+pub mod resources;
 pub mod updates;
 
-pub use crate::graphics::common::Size;
-pub use crate::resources::{shaders, textures};
+pub use crate::{
+    graphics::common::Size,
+    resources::{shaders, textures},
+};
 
 use event::{RunnerEvent, WindowEvent};
+
+pub use num_traits;
+pub use palette;
+pub use parking_lot;
+pub use wgpu;
+pub use winit;
 
 pub trait MainRunner {
     type Runner: ThreadRunner + Send + Sync;
@@ -50,7 +59,7 @@ pub trait MainRunner {
         window: &winit::window::Window,
         device: &wgpu::Device,
         queue: &wgpu::Queue,
-    );
+    ) -> u32;
     fn render(
         &mut self,
         device: &wgpu::Device,
@@ -82,7 +91,8 @@ pub trait ThreadRunner {
         window: &winit::window::Window,
         device: &wgpu::Device,
         queue: &wgpu::Queue,
-    );
+        delta: (f32, Duration),
+    ) -> u32;
     fn render(
         &mut self,
         device: &wgpu::Device,
@@ -106,7 +116,9 @@ where
         .build(&event_loop)
         .unwrap();
 
-    let mut frame_time = std::time::Instant::now();
+    let mut frame_time = std::time::Duration::from_secs_f32(1.0 / 60.0);
+    let mut fps = 60.0;
+    let mut clock = clock::Clock::new(60);
 
     let renderer = Arc::new(block_on(render::RenderState::new(&window)));
 
@@ -189,19 +201,20 @@ where
                 cvar.notify_one();
             }
             Event::RedrawRequested(_) => {
-                let frame = std::time::Duration::from_secs_f32(1.0 / 60.0);
-                let delta = frame_time.elapsed();
-                frame_time = std::time::Instant::now();
-                runner.update(&window, &renderer.device, &renderer.queue);
+                clock.tick();
+
+                clock.target_rate = runner.update(&window, &renderer.device, &renderer.queue);
                 match renderer.render(&window, Arc::clone(&thread_runner), &mut runner) {
                     Ok(_) => {
                         event_proxy
-                            .send_event(RunnerEvent::RenderComplete(delta))
+                            .send_event(RunnerEvent::RenderComplete {
+                                frame_time,
+                                tick_rate: fps,
+                            })
                             .unwrap();
-                        let curr_frame = frame_time.elapsed();
-                        if curr_frame < frame {
-                            std::thread::sleep(frame - curr_frame);
-                        }
+                        let (tick_rate, curr_time) = clock.wait();
+                        frame_time = curr_time;
+                        fps = tick_rate;
                     }
                     Err(wgpu::SwapChainError::Lost) => {
                         let size = {

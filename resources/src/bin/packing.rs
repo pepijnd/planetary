@@ -1,6 +1,6 @@
-use std::io::prelude::*;
 use std::{
     fs::read_to_string,
+    io::prelude::*,
     path::{Path, PathBuf},
 };
 

@@ -7,20 +7,20 @@ edition = "2018"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-resources = { path = "../resources" }
+resources = { path = "../resources", default-features = false }
 
-bytemuck = { version = "1.5.0", features = [ "derive" ] }
+bytemuck = { version = "1.5.1", features = [ "derive" ] }
 glam = { version = "0.13.1", features = [ "bytemuck", "mint" ] }
 futures = { version = "0.3.12", features = [ "thread-pool" ] }
+palette =  { version = "0.5.0", default-features = false, features = [ "std" ] }
 
 winit = "0.24.0"
 env_logger = "0.8.2"
 log = "0.4.13"
-wgpu = "0.7.0"
+wgpu = "0.7.1"
 anyhow = "1.0.40"
 num-traits = "0.2.14"
 crevice = "0.6.0"
 mint = "0.5.6"
-palette = "0.5.0"
 lazy_static = "1.4.0"
 parking_lot = "0.11.1"

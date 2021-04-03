@@ -2,7 +2,7 @@ use std::{collections::BTreeMap, num::NonZeroU32};
 
 use engine::graphics::helper::calc_normal;
 
-use num_traits::FloatConst;
+use engine::num_traits::FloatConst;
 use rand::prelude::*;
 
 use crate::pipelines::ico::IcoVertex;

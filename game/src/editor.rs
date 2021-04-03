@@ -1,19 +1,21 @@
 use std::sync::Arc;
 
-use num_traits::float::FloatConst;
-use parking_lot::Mutex;
-use wgpu::TextureFormat;
+use engine::{num_traits::float::FloatConst, parking_lot::Mutex, wgpu::TextureFormat};
 
 use engine::{
     camera::Camera,
     event::{RunnerEvent, WindowEvent},
-    graphics::common::{BundleData, PipelineFormat, Renderer, RendererInvalid},
-    graphics::helper::begin_render_pass,
-    graphics::{common::ItemBuffer, texture::Texture},
+    graphics::{
+        common::{BundleData, ItemBuffer, PipelineFormat, Renderer, RendererInvalid},
+        helper::begin_render_pass,
+        texture::Texture,
+    },
+    palette,
     render::RenderTarget,
+    wgpu, winit,
+    winit::event::{ElementState, KeyboardInput, VirtualKeyCode},
     MainRunner, Size,
 };
-use winit::event::{ElementState, KeyboardInput, VirtualKeyCode};
 
 use crate::{
     pipelines::ico::{IcoBuffer, IcoRenderer, IcoRendererSettings, IcoUniform},
@@ -60,13 +62,12 @@ pub struct Editor {
 
 impl Editor {
     pub fn new(
-        window: &winit::window::Window,
+        _window: &winit::window::Window,
         device: &wgpu::Device,
         queue: &wgpu::Queue,
         sc_desc: &wgpu::SwapChainDescriptor,
     ) -> Self {
-        let mut state = EditorState::default();
-        let ui = EditorUi::new(&window, &device, &queue, &sc_desc, &mut state);
+        let state = EditorState::default();
 
         let camera = Camera::new(sc_desc, f32::FRAC_PI_2() / 2.0, *state.zoom as f32);
         let size = wgpu::Extent3d {
@@ -163,7 +164,7 @@ impl Editor {
             state,
             modifiers,
 
-            delta: std::time::Duration::from_secs_f32(1.0/60.0),
+            delta: std::time::Duration::from_secs_f32(1.0 / 60.0),
             last_frame: std::time::Instant::now(),
 
             mouse_raw,
@@ -263,8 +264,12 @@ impl Editor {
                 }
                 _ => false,
             },
-            RunnerEvent::RenderComplete(delta) => {
-                self.state.frame_times.push(delta);
+            RunnerEvent::RenderComplete {
+                frame_time,
+                tick_rate,
+            } => {
+                self.state.frame_time = frame_time;
+                self.state.fps = tick_rate;
                 false
             }
             RunnerEvent::None => false,
@@ -289,7 +294,7 @@ impl Editor {
         &mut self,
         device: &wgpu::Device,
         queue: &wgpu::Queue,
-        window: &winit::window::Window,
+        _window: &winit::window::Window,
     ) {
         if let Some(&samples) = self.state.samples.on_change() {
             self.sampled_depth_texture = self
@@ -339,12 +344,12 @@ impl Editor {
 
     pub fn render(
         &mut self,
-        device: &wgpu::Device,
-        queue: &wgpu::Queue,
+        _device: &wgpu::Device,
+        _queue: &wgpu::Queue,
         target: &RenderTarget,
         frame: &wgpu::TextureView,
         encoder: &mut wgpu::CommandEncoder,
-        window: &winit::window::Window,
+        _window: &winit::window::Window,
     ) {
         let color = palette::rgb::Srgb::from_components((0.53, 0.81, 0.92)).into_linear();
         let msaa = if *self.state.samples == 1 {

@@ -1,7 +1,6 @@
-use std::sync::Arc;
+use std::{sync::Arc, time::Duration};
 
-use engine::{event::RunnerEvent, graphics::texture::Texture};
-use parking_lot::Mutex;
+use engine::{event::RunnerEvent, graphics::texture::Texture, parking_lot::Mutex, wgpu, winit};
 
 pub struct UiValue<T>
 where
@@ -83,8 +82,13 @@ pub struct EditorState {
     pub samples: UiValue<i32>,
     pub samples_select: i32,
 
-    pub frame_times: Vec<std::time::Duration>,
+    pub frame_time: Duration,
     pub fps: f32,
+    pub target_fps: u32,
+
+    pub tick_time: Duration,
+    pub tick_rate: f32,
+    pub target_tick_rate: u32,
 
     pub image_id: Option<imgui::TextureId>,
 
@@ -100,8 +104,14 @@ impl Default for EditorState {
             light_mix: UiValue::new(0.5),
             samples: UiValue::new(1),
             samples_select: 0,
-            frame_times: Vec::with_capacity(60),
-            fps: 0.0,
+            frame_time: Duration::from_secs_f32(1.0 / 60.0),
+            fps: 60.0,
+            target_fps: 60,
+
+            tick_time: Duration::from_secs_f32(1.0 / 100.0),
+            tick_rate: 100.0,
+            target_tick_rate: 100,
+
             image_id: None,
             ui_io: Arc::new(Mutex::new(UiIo::new(false, false))),
         }
@@ -232,11 +242,6 @@ impl EditorUi {
     }
 
     pub fn draw(frame: &imgui::Ui, window: &winit::window::Window, state: &mut EditorState) {
-        let total: std::time::Duration = state.frame_times.iter().sum();
-        if total > std::time::Duration::from_millis(250) {
-            state.fps = state.frame_times.len() as f32 / total.as_secs_f32();
-            state.frame_times.clear();
-        }
         imgui::Window::new(imgui::im_str!("Xerograph"))
             .size(
                 [400.0, window.inner_size().height as f32 - 30.0],
@@ -250,6 +255,18 @@ impl EditorUi {
                     imgui::im_str!("fps"),
                     &imgui::ImString::new(format!("{:.2}", state.fps)),
                 );
+                imgui::Slider::new(imgui::im_str!("target fps"))
+                    .range(1..=240)
+                    .flags(imgui::SliderFlags::ALWAYS_CLAMP)
+                    .build(frame, &mut state.target_fps);
+                frame.label_text(
+                    imgui::im_str!("tick rate"),
+                    &imgui::ImString::new(format!("{:.2}", state.tick_rate)),
+                );
+                imgui::Slider::new(imgui::im_str!("target tick rate"))
+                    .range(1..=10000)
+                    .flags(imgui::SliderFlags::ALWAYS_CLAMP)
+                    .build(frame, &mut state.target_tick_rate);
                 imgui::Slider::new(imgui::im_str!("Size"))
                     .range(0..=5)
                     .flags(imgui::SliderFlags::ALWAYS_CLAMP)
@@ -259,10 +276,6 @@ impl EditorUi {
                     .flags(imgui::SliderFlags::ALWAYS_CLAMP)
                     .build(frame, &mut state.zoom);
                 frame.checkbox(imgui::im_str!("Perspective"), &mut state.perspective);
-                imgui::Slider::new(imgui::im_str!("Shading"))
-                    .range(0.0..=1.0)
-                    .flags(imgui::SliderFlags::ALWAYS_CLAMP)
-                    .build(frame, &mut state.light_mix);
                 let values = vec![1, 2, 4, 8];
                 let items = values
                     .iter()
