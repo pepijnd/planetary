@@ -55,8 +55,8 @@ impl BundleData for IcoBuffer {
 #[derive(Debug, Copy, Clone, AsStd140)]
 pub struct IcoUniform {
     pub view_proj: mint::ColumnMatrix4<f32>,
-    pub view_angle: mint::Vector3<f32>,
-    pub light_dir: mint::Vector3<f32>,
+    pub view_pos: mint::Vector3<f32>,
+    pub light_pos: mint::Vector3<f32>,
     pub selected: u32,
     pub s1: u32,
     pub s2: u32,
@@ -71,12 +71,14 @@ pub struct IcoVertex {
     pub index: u32,
     pub tex_coords: [f32; 2],
     pub tex_idx: u32,
+    pub tangent: [f32; 3],
+    pub bitangent: [f32; 3],
 }
 
 impl IcoVertex {
     pub fn desc<'a>() -> wgpu::VertexBufferLayout<'a> {
         wgpu::VertexBufferLayout {
-            array_stride: std::mem::size_of::<[f32; 10]>() as wgpu::BufferAddress,
+            array_stride: std::mem::size_of::<[u32; 16]>() as wgpu::BufferAddress,
             step_mode: wgpu::InputStepMode::Vertex,
             attributes: &[
                 wgpu::VertexAttribute {
@@ -104,6 +106,16 @@ impl IcoVertex {
                     shader_location: 4,
                     format: wgpu::VertexFormat::Uint,
                 },
+                wgpu::VertexAttribute {
+                    offset: std::mem::size_of::<[f32; 10]>() as wgpu::BufferAddress,
+                    shader_location: 5,
+                    format: wgpu::VertexFormat::Uint,
+                },
+                wgpu::VertexAttribute {
+                    offset: std::mem::size_of::<[f32; 13]>() as wgpu::BufferAddress,
+                    shader_location: 6,
+                    format: wgpu::VertexFormat::Uint,
+                },
             ],
         }
     }
@@ -117,6 +129,7 @@ pub struct IcoRendererSettings {
 
 pub struct IcoRenderer {
     pub texture_binding: TextureBinding,
+    pub normal_binding: TextureBinding,
     pub uniform_binding: UniformBinding<IcoUniform>,
     pub vs: &'static str,
     pub fs: &'static str,
@@ -136,6 +149,7 @@ impl Pipeline for IcoRenderer {
             layouts: &[
                 &self.uniform_binding.layout,
                 &self.texture_binding.layout.layout,
+                &self.normal_binding.layout.layout,
             ],
             buffers: &[IcoVertex::desc()],
             samples,
@@ -166,6 +180,7 @@ impl Pipeline for IcoRenderer {
         bundle.set_pipeline(pipeline);
         bundle.set_bind_group(0, &self.uniform_binding.binding, &[]);
         bundle.set_bind_group(1, &self.texture_binding.binding, &[]);
+        bundle.set_bind_group(2, &self.normal_binding.binding, &[]);
         bundle.set_vertex_buffer(0, vb.slice(..));
         bundle.draw(0..data.vertex_buffer.num_items() as u32, 0..1);
         bundle.finish(&wgpu::RenderBundleDescriptor {
@@ -178,11 +193,14 @@ impl Pipeline for IcoRenderer {
         let tex_store = engine::textures();
         let tex_lock = tex_store.lock();
         let textures = tex_lock.get("ico_textures").expect("texture not found");
+        let normal = tex_lock.get("ico_stitch_map").expect("texture not found");
+        let texture_binding = create_texture_binding(device, textures, Some("ico"));
+        let normal_binding = create_texture_binding(device, normal, Some("stitch"));
         let uniform_binding: UniformBinding<IcoUniform> =
             create_uniform_binding(device, Some("ico"));
-        let texture_binding = create_texture_binding(device, textures, Some("ico"));
         Self {
             texture_binding,
+            normal_binding,
             uniform_binding,
             vs,
             fs,

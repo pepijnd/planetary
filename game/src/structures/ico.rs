@@ -1,6 +1,6 @@
 use std::{collections::BTreeMap, num::NonZeroU32};
 
-use engine::graphics::helper::calc_normal;
+use engine::graphics::helper::{calc_normal, calc_tangent};
 
 use engine::num_traits::FloatConst;
 use rand::prelude::*;
@@ -54,11 +54,12 @@ impl Ico {
 
     fn tex_coords(index: u16) -> [glam::Vec2; 3] {
         let base = index as f32 % (2.0 * f32::PI());
-        [
+        let a: [glam::Vec2; 3] = [
             Self::tex_from_radius(base, 0).into(),
             Self::tex_from_radius(base, 1).into(),
             Self::tex_from_radius(base, 2).into(),
-        ]
+        ];
+        a
     }
 
     pub fn base() -> Self {
@@ -223,6 +224,7 @@ impl Ico {
         self.faces
             .iter()
             .flat_map(|f| {
+                let (tangent, bitangent) = calc_tangent(f.vertices, f.tex_coords);
                 f.vertices
                     .iter()
                     .copied()
@@ -233,6 +235,8 @@ impl Ico {
                         index: f.index.get(),
                         tex_coords: t.into(),
                         tex_idx: f.tex_index,
+                        tangent: tangent.into(),
+                        bitangent: bitangent.into(),
                     })
             })
             .collect()

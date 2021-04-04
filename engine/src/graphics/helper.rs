@@ -285,3 +285,14 @@ where
     let normal = u.cross(v);
     mint::Vector3::from(normal).into()
 }
+
+pub fn calc_tangent(v: [glam::Vec3; 3], t: [glam::Vec2; 3]) -> (glam::Vec3, glam::Vec3) {
+    let dp1 = v[1] - v[0];
+    let dp2 = v[2] - v[0];
+    let duv1 = t[1] - t[0];
+    let duv2 = t[2] - t[0];
+    let r = 1.0 / (duv1.x*duv2.y - duv1.y*duv2.x);
+    let tangent: glam::Vec3 = (dp1*duv2.y - dp2*duv1.y) * r;
+    let bitangent: glam::Vec3 = (dp2*duv1.x - dp1*duv2.x) * r;
+    (tangent, bitangent)
+}

@@ -128,8 +128,8 @@ impl Editor {
 
         let ico_uniform = IcoUniform {
             view_proj: camera.build(*state.perspective).into(),
-            view_angle: camera.rot.into(),
-            light_dir: glam::vec3(-0.5, -0.5, -1.0).normalize().into(),
+            view_pos: (camera.rot * -camera.zoom).into(),
+            light_pos: glam::vec3(-5.0, -5.0, -10.0).into(),
             selected: 0,
             s1: 0,
             s2: 0,
@@ -327,7 +327,7 @@ impl Editor {
         // self.select_buffer.buffer().unmap();
 
         self.ico_uniform.view_proj = view_proj.into();
-        self.ico_uniform.view_angle = self.camera.rot.into();
+        self.ico_uniform.view_pos = (self.camera.rot * -self.camera.zoom).into();
         self.ico_uniform.selected = self.selected;
         self.ico_screen
             .renderer
