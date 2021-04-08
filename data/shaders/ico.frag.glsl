@@ -23,17 +23,13 @@ layout(set=1, binding=1) uniform sampler s_diffuse;
 layout(set=2, binding=0) uniform texture2D t_normal;
 layout(set=2, binding=1) uniform sampler s_normal;
 
-
-
-
-
 layout(location=0) out vec4 f_color;
 
 void main() {
     vec4 object_color = texture(sampler2DArray(t_diffuse, s_diffuse), vec3(v_tex_coord, float(v_tex_idx)));
     vec4 object_normal = texture(sampler2D(t_normal, s_normal), v_tex_coord);
 
-    float ambient_strength = 0.15;
+    float ambient_strength = 0.05;
 
     vec3 normal = normalize(object_normal.rgb * 2.0 - 1.0);
     vec3 light_dir = normalize(v_light_pos - v_position);
@@ -42,7 +38,7 @@ void main() {
     vec3 view_dir = normalize(v_view_pos - v_position);
     vec3 half_dir = normalize(view_dir + light_dir);
 
-    float specular_strength = pow(max(dot(normal, half_dir), 0.0), 32.0) * 0.0;
+    float specular_strength = pow(max(dot(normal, half_dir), 0.0), 32.0) * 0.25;
     vec3 color = vec3(ambient_strength + diffuse_strength + specular_strength) * object_color.xyz;
     f_color = vec4(color, object_color.w);
 }

@@ -129,7 +129,7 @@ impl Editor {
         let ico_uniform = IcoUniform {
             view_proj: camera.build(*state.perspective).into(),
             view_pos: (camera.rot * -camera.zoom).into(),
-            light_pos: glam::vec3(-5.0, -5.0, -10.0).into(),
+            light_pos: glam::vec3(-50.0, -50.0, -100.0).into(),
             selected: 0,
             s1: 0,
             s2: 0,

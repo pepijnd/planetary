@@ -1,0 +1,28 @@
+{
+    "inputs": [
+        {
+            "label": "shader.ico.vert",
+            "input": {
+                "Shader": {
+                    "path": "shaders/ico.vert.glsl"
+                }
+            }
+        },
+        {
+            "label": "shader.ico.frag",
+            "input": {
+                "Shader": {
+                    "path": "shaders/ico.frag.glsl"
+                }
+            }
+        },
+        {
+            "label": "shader.ico.select.frag",
+            "input": {
+                "Shader": {
+                    "path": "shaders/ico_select.frag.glsl"
+                }
+            }
+        }
+    ]
+}

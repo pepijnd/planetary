@@ -3,12 +3,19 @@ use std::{io::prelude::*, num::NonZeroU32, path::PathBuf};
 use flate2::read::ZlibDecoder;
 use serde::{Deserialize, Serialize};
 
+#[derive(Debug, Serialize, Deserialize)]
+pub enum ImageFormat {
+    LinearRgb,
+    Srgb,
+}
+
 #[derive(Serialize, Deserialize)]
 pub struct ImageRgba {
     pub size: (u32, u32),
     pub depth: u32,
     pub levels: u32,
     pub data: Vec<u8>,
+    pub format: ImageFormat,
 }
 
 impl ImageRgba {
@@ -46,6 +53,7 @@ pub enum Input {
 pub struct ImageInput {
     pub paths: Vec<PathBuf>,
     pub mipmaps: Option<NonZeroU32>,
+    pub format: ImageFormat,
 }
 
 #[derive(Debug, Serialize, Deserialize)]

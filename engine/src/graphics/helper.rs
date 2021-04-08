@@ -282,7 +282,7 @@ where
     let w = glam::Vec3::from(v1.into());
     let u = glam::Vec3::from(v2.into()) - w;
     let v = glam::Vec3::from(v3.into()) - w;
-    let normal = u.cross(v);
+    let normal = u.cross(v).normalize();
     mint::Vector3::from(normal).into()
 }
 

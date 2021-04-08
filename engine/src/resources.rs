@@ -25,7 +25,10 @@ pub fn shaders() -> Arc<Mutex<HashMap<String, wgpu::ShaderModule>>> {
 
 pub fn load(device: &wgpu::Device, queue: &wgpu::Queue) -> Result<(), Box<dyn std::error::Error>> {
     log::info!("loading resources");
-    let resources = resources::read()?;
+    let resources = resources::read(&[
+        "shaders.dat",
+        "textures.dat"
+    ])?;
 
     let mut buffer = Vec::new();
 
@@ -45,6 +48,7 @@ pub fn load(device: &wgpu::Device, queue: &wgpu::Queue) -> Result<(), Box<dyn st
                     queue,
                     &buffer[..size],
                     image.size,
+                    image.format,
                     image.depth,
                     image.levels,
                     &label,
@@ -66,11 +70,13 @@ pub fn load(device: &wgpu::Device, queue: &wgpu::Queue) -> Result<(), Box<dyn st
     Ok(())
 }
 
+#[allow(clippy::too_many_arguments)]
 fn make_texture(
     device: &wgpu::Device,
     queue: &wgpu::Queue,
     data: &[u8],
     size: (u32, u32),
+    format: ImageFormat,
     depth: u32,
     levels: u32,
     label: &str,
@@ -86,7 +92,10 @@ fn make_texture(
                 depth,
             },
             dimension: TextureDimension::D2,
-            format: TextureFormat::Bc3RgbaUnormSrgb,
+            format: match dbg!(format) {
+                ImageFormat::LinearRgb => TextureFormat::Bc3RgbaUnorm,
+                ImageFormat::Srgb => TextureFormat::Bc3RgbaUnormSrgb
+            },
             usage: TextureUsage::SAMPLED | TextureUsage::COPY_DST,
             samples: 1,
             levels,
